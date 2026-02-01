@@ -1,0 +1,51 @@
+[package]
+name = "yona"
+version = "0.1.0"
+description = "Anchor program for yona"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "yona"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+custom-heap = []
+custom-panic = []
+anchor-debug = []
+
+# Network-specific features for authorization
+localnet = []     # For local development and testing (no auth required)
+
+[dependencies]
+anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
+anchor-spl = { version = "0.31.0",  features = ["metadata"] }
+bytemuck = { version = "1.20.0", features = ["derive", "min_const_generics"] }
+light-poseidon = "0.3.0"
+light-hasher = "2.0.0"
+num-bigint = "0.4.4"
+ark-bn254 = { version = "0.5.0", features = [] }
+ark-ff = { version = "0.5.0", features = [] }
+ark-serialize = { version = "0.5.0", features = [] }
+thiserror = "1.0.69"
+solana-bn254 = "2.2.2"
+light-sdk = { version = "0.17.1", features = ["anchor", "poseidon", "merkle-tree", "v2"] }
+groth16-solana = { git = "https://github.com/Lightprotocol/groth16-solana", rev = "66c0dc87d0808c4d2aadb53c61435b6edb8ddfd9" }
+
+
+[dev-dependencies]
+lazy_static = "1.4.0"
+rand = "0.9.0"
+groth16-solana = { git = "https://github.com/Lightprotocol/groth16-solana", features = ["vk", "circom"], rev = "66c0dc87d0808c4d2aadb53c61435b6edb8ddfd9" }
+
+
+[build-dependencies]
+
+[target.'cfg(not(target_os = "solana"))'.build-dependencies]
+rust-witness = "0.1"
+groth16-solana = { git = "https://github.com/Lightprotocol/groth16-solana", features = ["vk"], rev = "66c0dc87d0808c4d2aadb53c61435b6edb8ddfd9" }

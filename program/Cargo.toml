@@ -1,0 +1,27 @@
+[workspace]
+members = [
+    "programs/*"
+]
+resolver = "2"
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1
+
+# Patch to fix zeroize version conflicts
+# curve25519-dalek v3.2.1 has an upper bound on zeroize (>=1, <1.4)
+# but other dependencies require newer versions (^1.7)
+# This patched version removes the zeroize constraint
+[patch.crates-io.curve25519-dalek]
+git = "https://github.com/solana-labs/curve25519-dalek.git"
+rev = "b500cdc2a920cd5bff9e2dd974d7b97349d61464"
+
+# Patch aes-gcm-siv to remove zeroize constraint
+[patch.crates-io.aes-gcm-siv]
+git = "https://github.com/RustCrypto/AEADs"
+rev = "6105d7a5591aefa646a95d12b5e8d3f55a9214ef"

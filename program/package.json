@@ -1,0 +1,47 @@
+{
+  "license": "ISC",
+  "scripts": {
+    "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
+    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+    "test:bankrun": "RUST_LOG=solana_runtime::system_instruction_processor=trace,solana_runtime::message_processor=debug,solana_bpf_loader=debug,solana_rbpf=debug ts-mocha -p ./tsconfig.json -t 1000000 tests/bankrun.ts",
+    "test:localnet": "ts-mocha -p ./tsconfig.json -t 1000000 tests/localnet.ts",
+    "test:light": "ts-mocha -p ./tsconfig.json -t 1000000 tests/light.ts",
+    "cli:init": "ts-node scripts/init.ts",
+    "cli:mints": "ts-node scripts/create-mints.ts",
+    "cli:mint-to": "ts-node scripts/mint-to.ts",
+    "cli:init-ata": "ts-node scripts/init-ata.ts",
+    "cli:create-alt": "ts-node scripts/create-alt.ts",
+    "cli:add-token": "ts-node scripts/add-token.ts",
+    "cli:setup": "ts-node scripts/setup-all.ts",
+    "cli:status": "ts-node scripts/status.ts",
+    "cli:check-aml": "ts-node scripts/check-aml.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.0",
+    "@lightprotocol/stateless.js": "^0.22.0",
+    "@solana/spl-token": "^0.4.14",
+    "anchor-bankrun": "^0.5.0",
+    "circomlib": "^2.0.5",
+    "ffjavascript": "^0.3.1",
+    "solana-bankrun": "^0.4.0"
+  },
+  "devDependencies": {
+    "@ethersproject/sha2": "^5.8.0",
+    "@lightprotocol/hasher.rs": "^0.2.1",
+    "@types/bn.js": "^5.1.0",
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^9.0.0",
+    "@types/node": "^24.10.1",
+    "bn.js": "^5.2.2",
+    "borsh": "^2.0.0",
+    "chai": "^4.3.4",
+    "ethers": "^6.13.7",
+    "mocha": "^9.0.3",
+    "prettier": "^2.6.2",
+    "snarkjs": "^0.7.5",
+    "tmp-promise": "^3.0.2",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.7.3"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}
