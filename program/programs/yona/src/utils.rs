@@ -230,7 +230,7 @@ pub fn verify_compressed_proof(proof: CompressedProof, verifying_key: Groth16Ver
     public_inputs_vec[7] = proof.input_nullifiers[1];
     public_inputs_vec[8] = proof.output_commitments[0];
     public_inputs_vec[9] = proof.output_commitments[1];
-    msg!("decompressing proof_a");
+
     let proof_a = decompress_g1(&proof.proof_a).map_err(|e| {
         let code: u32 = e.into();
         Error::from(ProgramError::Custom(code))
@@ -245,7 +245,6 @@ pub fn verify_compressed_proof(proof: CompressedProof, verifying_key: Groth16Ver
         Error::from(ProgramError::Custom(code))
     }).unwrap();
 
-    msg!("verifying proof");
     let mut verifier = match Groth16Verifier::new(
         &proof_a,
         &proof_b,

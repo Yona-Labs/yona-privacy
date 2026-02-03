@@ -1,8 +1,16 @@
+for localtests
+
+```
+light test-validator 
+anchor test --skip-local-validator
+
+```
 
 
-lsof -i:3001
-lsof -i:8784
-lsof -i:8899
-
-# Kill all processes on these ports
+# Kill all light validator processes
+```
 ./kill-ports.sh
+```
+
+
+only light.ts tests are working

@@ -58,7 +58,8 @@ impl MerkleTree {
                 right = current_level_hash;
                 proof[i] = left;
             }
-            current_level_hash = H::hashv(&[&left, &right]).unwrap();
+            current_level_hash = H::hashv(&[&left, &right])
+                .ok_or(ErrorCode::ArithmeticOverflow)?;
             current_index /= 2;
         }
         

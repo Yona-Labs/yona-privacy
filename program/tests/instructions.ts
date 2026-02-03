@@ -955,7 +955,7 @@ export async function sendTransactionWithALT(
 
   // Send and confirm
   const signature = await connection.sendTransaction(versionedTx, {
-    skipPreflight: true,
+    skipPreflight: false,
     preflightCommitment: 'confirmed',
   });
 

@@ -135,6 +135,15 @@ describe("localnet", () => {
       program.programId
     );
 
+    // Check if globalConfig already exists
+    const globalConfigInfo = await connection.getAccountInfo(globalConfig);
+
+    if (globalConfigInfo) {
+      console.log("GlobalConfig already initialized, skipping...");
+      console.log("Global Config:", globalConfig.toString());
+      return;
+    }
+
     const tx = await program.methods
       .initialize()
       .accountsStrict({
@@ -308,8 +317,12 @@ describe("localnet", () => {
       true
     );
 
-    // Create reserve token account if doesn't exist
+    // Create reserve token accounts if they don't exist
     const reserveAccountInfo = await connection.getAccountInfo(reserveTokenAccount);
+    const reserveAccountInfoB = await connection.getAccountInfo(reserveTokenAccountB);
+
+    const createAtaTx = new Transaction();
+
     if (!reserveAccountInfo) {
       const createAtaIx = createAssociatedTokenAccountInstruction(
         admin.publicKey,
@@ -317,19 +330,20 @@ describe("localnet", () => {
         globalConfig,
         mintAddressA
       );
+      createAtaTx.add(createAtaIx);
+    }
+
+    if (!reserveAccountInfoB) {
       const createAtaIxB = createAssociatedTokenAccountInstruction(
         admin.publicKey,
         reserveTokenAccountB,
         globalConfig,
         mintAddressB
       );
-      const createAtaIxNative = createAssociatedTokenAccountInstruction(
-        admin.publicKey,
-        getAssociatedTokenAddressSync(NATIVE_MINT, globalConfig, true),
-        globalConfig,
-        NATIVE_MINT
-      );
-      const createAtaTx = new Transaction().add(createAtaIx, createAtaIxB, createAtaIxNative);
+      createAtaTx.add(createAtaIxB);
+    }
+
+    if (createAtaTx.instructions.length > 0) {
       await sendAndConfirmTransaction(connection, createAtaTx, [admin], {});
     }
 
@@ -444,7 +458,7 @@ describe("localnet", () => {
     );
     console.log("Deposit with Light Protocol nullifiers successful!");
 
-    
+
 
     // Update merkle tree
     for (const commitment of depositOutputCommitments) {
@@ -856,6 +870,9 @@ describe("localnet", () => {
     };
 
     console.log("Attempting double-spend with same nullifier...");
+    let transactionSucceeded = false;
+    let errorMessage = "";
+
     try {
       const withdrawTx = await buildWithdrawWithLightNullifiersInstruction(
         program,
@@ -875,17 +892,24 @@ describe("localnet", () => {
         1400000
       );
 
-      // If we get here, the test should fail
-      expect.fail("Double-spend should have been rejected");
+      transactionSucceeded = true;
     } catch (error: any) {
+      errorMessage = error.message;
       console.log("Double-spend correctly rejected!");
-      console.log("Error:", error.message);
-      // The error should be from Light Protocol indicating the address already exists
-      expect(error.message).to.satisfy((msg: string) => 
-        msg.includes("AddressAlreadyExists") || 
+      console.log("Error:", errorMessage);
+    }
+
+    // Verify the transaction was rejected
+    expect(transactionSucceeded).to.be.false;
+
+    // If we got an error, verify it's the expected type
+    if (errorMessage) {
+      expect(errorMessage).to.satisfy((msg: string) =>
+        msg.includes("AddressAlreadyExists") ||
         msg.includes("already exists") ||
         msg.includes("failed") ||
-        msg.includes("error")
+        msg.includes("error") ||
+        msg.includes("NullifierAlreadyExists")
       );
     }
   });
