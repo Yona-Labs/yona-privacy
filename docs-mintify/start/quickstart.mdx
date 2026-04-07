@@ -1,0 +1,104 @@
+---
+title: "Getting Started"
+description: "Everything you need to know to start using Yona privacy protocol"
+---
+
+## Connecting Your Wallet
+
+Using Yona is a straightforward process that begins with connecting your Solana wallet (such as Phantom, Backpack, or Solflare) to the Yona app.
+
+Upon connecting, you can begin shielding your tokens into the private pool. Yona supports SOL, USDC, USDT, and ZEC tokens.
+
+It is recommended to test with small amounts first before shielding larger balances. Always ensure you backup your encrypted wallet data after your first deposit.
+
+You can perform private swaps and withdrawals at any time. Any operation you make will utilize zero-knowledge proofs to maintain complete privacy.
+
+## Shielding Tokens
+
+Once you have connected your wallet, you can shield your tokens to make them private and anonymous. You can deposit tokens from:
+
+- A Solana wallet (Phantom, Backpack, etc.)
+- Centralized exchange
+- Any source that can send SPL tokens
+
+Note: Before shielding a large amount, it is recommended to first test with a small sum to ensure:
+
+- You understand the process
+- Your backup is properly saved
+- You can successfully withdraw
+
+When you shield tokens, they are deposited into a shared pool and become completely anonymous. A cryptographic commitment is added to the Merkle tree, and your balance is represented by encrypted UTXOs that only you can see and spend.
+
+Learn more about how the privacy mechanism works [here](/concepts/how-it-works).
+
+## Private Operations
+
+The Yona app provides an intuitive interface to not just hold but actively use your private assets.
+
+### Private Swaps
+
+Yona users can swap tokens privately while maintaining complete anonymity using:
+
+**Jupiter Integration:** Exchange tokens at market rates while keeping all transaction details private.
+
+**Zero-Knowledge Proofs:** Every swap generates a cryptographic proof that validates the transaction without revealing sender, receiver, or amounts.
+
+The swap interface allows you to select input and output tokens, view current market rates powered by Jupiter, and execute the swap with full privacy guarantees.
+
+Learn more about private swaps [here](/features/swap).
+
+### Withdrawing Tokens
+
+You can withdraw (unshield) your private tokens to any Solana address at any time. The withdrawal process:
+
+- Generates a zero-knowledge proof (takes 10-30 seconds)
+- Allows you to specify any recipient address, not just your own
+- Breaks all on-chain linkages to your original deposits
+
+For maximum privacy, you can use the optional relayer service to submit withdrawals without revealing your IP address. The relayer pays the transaction fee and receives a small fee you specify (minimum 0.00001 SOL).
+
+## Privacy Best Practices
+
+Always backup your encrypted wallet data immediately after your first deposit. Your backup contains the private keys needed to access your shielded funds.
+
+Use different recipient addresses for each withdrawal to avoid linking transactions.
+
+Avoid depositing and immediately withdrawing, as timing correlation could reduce privacy.
+
+Consider using Tor or a VPN when accessing Yona for additional privacy.
+
+And if you need maximum anonymity, use the relayer service to hide your IP address from the blockchain.
+
+## Security
+
+### Backup Management
+
+**Critical: Always maintain secure backups of your encrypted wallet data.**
+
+Download your encrypted backup after the first deposit and store it in multiple secure locations (USB drive, encrypted cloud storage, etc.).
+
+Never share your backup file with anyone or upload it to public services.
+
+You can restore your wallet from backup at any time by uploading the file and entering your password.
+
+<Warning>
+Without your backup, there is no way to recover shielded funds if you lose access to your browser data!
+</Warning>
+
+### Understanding Privacy Guarantees
+
+Yona uses zero-knowledge proofs to provide strong privacy guarantees. The protocol hides transaction history between users, individual balances, and linkages between deposits and withdrawals.
+
+However, users should be aware of limitations:
+
+- The fact that you're using Yona is public
+- Deposit and withdrawal amounts could be correlated
+- Timing analysis is possible without using the relayer
+
+More on privacy considerations and best practices [here](/concepts/privacy).
+
+In the unlikely event that the Yona app or indexer would be unavailable, you can still access your funds using your backup data and any compatible Yona interface or by running your own indexer.
+
+## Contact Us
+
+If you are facing any issues or have questions, join our Discord or open an issue on GitHub.

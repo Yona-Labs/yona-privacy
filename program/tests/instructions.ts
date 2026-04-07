@@ -421,6 +421,130 @@ export async function buildWithdrawWithLightNullifiersInstruction(
 }
 
 /**
+ * Build transact instruction with Light Protocol nullifiers
+ * Used for shielded transfers (user-to-user) and UTXO consolidation.
+ * No tokens enter or leave the pool (ext_amount = 0, fee = 0).
+ * @param program - Anchor program instance
+ * @param proof - ZK proof data
+ * @param extData - External data (recipient, amount, fee, etc.)
+ * @param signer - Transaction signer public key
+ * @param inputMint - Token mint address
+ * @param lightRpc - Light Protocol RPC client
+ * @returns Transaction instruction
+ */
+export async function buildTransactWithLightNullifiersInstruction(
+  program: anchor.Program<Yona>,
+  proof: Proof,
+  extData: ExtData,
+  signer: PublicKey,
+  inputMint: PublicKey,
+  lightRpc: Rpc
+): Promise<TransactionInstruction[]> {
+  // Derive all necessary PDAs
+  const [treeAccount] = findMerkleTreePDA(program.programId);
+  const [globalConfig] = findGlobalConfigPDA(program.programId);
+
+  // Get Light Protocol state tree accounts
+  const { merkleTree: outputStateTree, addressTree, addressQueue } = defaultTestStateTreeAccounts();
+
+  // Derive nullifier addresses using Light Protocol
+  const nullifier0Seed = deriveAddressSeed(
+    [Buffer.from("nullifier"), Buffer.from(proof.inputNullifiers[0])],
+    program.programId,
+  );
+  const nullifier0Address = deriveAddress(nullifier0Seed, addressTree);
+
+  const nullifier1Seed = deriveAddressSeed(
+    [Buffer.from("nullifier"), Buffer.from(proof.inputNullifiers[1])],
+    program.programId,
+  );
+  const nullifier1Address = deriveAddress(nullifier1Seed, addressTree);
+
+  console.log("Transact - Nullifier 0 address:", nullifier0Address.toBase58());
+  console.log("Transact - Nullifier 1 address:", nullifier1Address.toBase58());
+
+  // Get validity proof for the two new addresses (proves they don't exist yet)
+  const proofResult = await lightRpc.getValidityProofV0(
+    [],
+    [
+      {
+        tree: addressTree,
+        queue: addressQueue,
+        address: bn(nullifier0Address.toBytes()),
+      },
+      {
+        tree: addressTree,
+        queue: addressQueue,
+        address: bn(nullifier1Address.toBytes()),
+      },
+    ],
+  );
+
+  console.log("Got Light Protocol validity proof for transact");
+
+  // Use PackedAccounts API to build remaining accounts correctly
+  const systemAccountConfig = SystemAccountMetaConfig.new(program.programId);
+  const packedAccounts = PackedAccounts.newWithSystemAccounts(systemAccountConfig);
+
+  // Insert tree accounts and get their indices
+  const addressMerkleTreePubkeyIndex = packedAccounts.insertOrGet(addressTree);
+  const addressQueuePubkeyIndex = packedAccounts.insertOrGet(addressQueue);
+  const outputMerkleTreeIndex = packedAccounts.insertOrGet(outputStateTree);
+
+  // Add nullifier queue
+  const nullifierQueue = defaultTestStateTreeAccounts().nullifierQueue;
+  packedAccounts.insertOrGet(nullifierQueue);
+
+  // Pack address tree info
+  const nullifier0AddressTreeInfo: PackedAddressTreeInfo = {
+    rootIndex: proofResult.rootIndices[0],
+    addressMerkleTreePubkeyIndex,
+    addressQueuePubkeyIndex,
+  };
+
+  const nullifier1AddressTreeInfo: PackedAddressTreeInfo = {
+    rootIndex: proofResult.rootIndices[1] ?? proofResult.rootIndices[0],
+    addressMerkleTreePubkeyIndex,
+    addressQueuePubkeyIndex,
+  };
+
+  const outputStateTreeIndex = outputMerkleTreeIndex;
+
+  // Light validity proof
+  const lightProof = {
+    0: {
+      a: Array.from(proofResult.compressedProof.a),
+      b: Array.from(proofResult.compressedProof.b),
+      c: Array.from(proofResult.compressedProof.c),
+    }
+  };
+
+  const instruction = await program.methods
+    .transact(
+      proof,
+      createExtDataMinified(extData),
+      extData.encryptedOutput,
+      lightProof,
+      nullifier0AddressTreeInfo,
+      nullifier1AddressTreeInfo,
+      outputStateTreeIndex
+    )
+    .accountsStrict({
+      treeAccount,
+      globalConfig,
+      inputMint: inputMint,
+      recipientAccount: extData.recipient,
+      feeRecipientAccount: extData.feeRecipient,
+      user: signer,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .remainingAccounts(packedAccounts.toAccountMetas().remainingAccounts)
+    .instruction();
+
+  return [instruction];
+}
+
+/**
  * Build swap instruction with Light Protocol nullifiers
  * @param program - Anchor program instance
  * @param proof - ZK proof data

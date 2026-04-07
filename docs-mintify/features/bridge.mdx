@@ -1,0 +1,100 @@
+---
+title: "Private Bridge"
+description: "Transfer tokens between chains privately"
+---
+
+## Overview
+
+The private bridge lets you move tokens between different blockchains while maintaining complete privacy. Your cross-chain transfers are encrypted and anonymous, so no one can track where your tokens came from or where they're going.
+
+## Why Private Bridge?
+
+Traditional bridges reveal your wallet address on both chains, show the exact amounts being transferred, expose the timing of your transfers, and link your activity across multiple blockchains. Yona private bridge hides which wallet initiated the transfer, keeps amounts confidential, breaks the link between source and destination chains, and protects your cross-chain activity.
+
+## How It Works
+
+Deposit tokens on the source chain and generate a zero-knowledge proof. The bridge validates the proof and locks your tokens. You receive encrypted bridge data containing the claim secrets. On the destination chain, submit the proof and claim your tokens to any address. Privacy is maintained throughout the entire process.
+
+## Making a Bridge Transfer
+
+Select your source chain (where your tokens are) and destination chain (where you want them). Choose the token and enter the amount you want to bridge. The app generates a zero-knowledge proof (takes 5-10 seconds), then confirm the transaction on the source chain.
+
+After the transaction confirms, you'll receive encrypted bridge data. Save this securely - you need it to claim tokens on the destination chain.
+
+<Warning>
+Bridge data is like your private key. Lose it and you lose access to your tokens on the destination chain!
+</Warning>
+
+## Claiming on Destination Chain
+
+Switch to the destination chain in your wallet, load your encrypted bridge data, enter the recipient address (can be any address for maximum privacy), generate the claim proof (3-5 seconds), and submit the transaction.
+
+The recipient receives tokens with no visible link to your source chain deposit.
+
+## Supported Chains
+
+Currently supported chains include Solana (SOL, USDC, USDT, all SPL tokens), Ethereum (ETH, USDC, USDT, ERC-20 tokens), and other EVM chains (Polygon, Arbitrum, Optimism, BSC).
+
+More chains are being added regularly.
+
+## Fees
+
+Protocol fee is approximately 0.1-0.5% of bridge amount. Source chain gas fee varies by network. Destination chain gas fee varies by network. Bridge validator fee is typically 0.1-0.2%.
+
+Example bridging 100 USDC from Solana to Ethereum:
+- Protocol fee: ~0.30 USDC
+- Solana fee: ~0.000005 SOL
+- Ethereum fee: ~$5-20 (gas dependent)
+- Validator fee: ~0.10 USDC
+- Total received: ~99.60 USDC
+
+## Bridge Timing
+
+Source chain confirmation typically takes 1-30 seconds depending on the chain. Validator processing takes 1-2 minutes for proof verification. Destination claim is available immediately after processing. Total time is usually 2-5 minutes end-to-end.
+
+## Privacy Tips
+
+For maximum privacy, don't bridge to the same address you bridged from, wait between bridge and claim operations, vary your bridge amounts to avoid patterns, use fresh addresses on the destination chain, and consider using VPN or Tor for additional privacy.
+
+## Security
+
+Bridge contracts are audited by reputable security firms. Validators are decentralized across multiple operators. Funds are secured by multi-sig and time-locks. Zero-knowledge proofs ensure transaction validity without revealing details.
+
+## Troubleshooting
+
+**Bridge Transaction Failed?** Check you have enough balance plus fees, verify both chains are supported, ensure you have gas on the source chain, and check network status.
+
+**Can't Claim on Destination?** Verify bridge transaction confirmed on source chain, check you have the correct bridge data, ensure you have gas on destination chain, and wait for validator processing to complete.
+
+**Lost Bridge Data?** Check your browser downloads folder, look for automatic backups in the app, and if completely lost, contact support with transaction hash (recovery may be possible with proof).
+
+**Claim Already Used?** You may have already claimed these tokens. Check destination chain transaction history or verify the bridge wasn't used by someone else (if data was compromised).
+
+## Emergency Recovery
+
+If bridge processing is stuck, check the validator status dashboard, verify source transaction confirmed, and contact support with your transaction hash. The team can help verify the state and resolve issues.
+
+## Bridge vs Traditional Transfer
+
+Traditional transfers are fast (instant) but have no privacy - everything is public. Private bridge transfers take 2-5 minutes but provide complete privacy with no links between chains. Traditional transfers are simple but risky as anyone can track you. Private bridge is more complex but secure with full anonymity.
+
+## Multi-Chain Strategy
+
+For maximum privacy across multiple chains: bridge from Chain A to Chain B with address X, wait a few hours, bridge from Chain B to Chain C with address Y, use different addresses on each chain, and spread transfers over time. This creates complete anonymity across the entire blockchain ecosystem.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deposits" icon="arrow-down" href="/features/deposit">
+    Add funds on source chain
+  </Card>
+  <Card title="Withdrawals" icon="arrow-up" href="/features/withdraw">
+    Cash out on any chain
+  </Card>
+  <Card title="Swaps" icon="arrows-rotate" href="/features/swap">
+    Exchange tokens privately
+  </Card>
+  <Card title="Privacy Tips" icon="user-secret" href="/concepts/privacy">
+    Maximize anonymity
+  </Card>
+</CardGroup>

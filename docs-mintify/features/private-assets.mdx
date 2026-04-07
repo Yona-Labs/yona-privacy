@@ -1,0 +1,77 @@
+---
+title: "Private Assets"
+description: "Create and manage compliant tokens with built-in privacy"
+---
+
+## Overview
+
+Private Assets allow managers to create custom SPL tokens that operate natively within the Yona privacy layer. Unlike standard tokens (SOL, USDC), private assets are minted on-demand with full compliance tracking — tokens are burned on deposit and minted on withdrawal, with the protocol acting as mint authority.
+
+This makes private assets ideal for regulated use cases where issuers need control over token supply while providing holders with transactional privacy.
+
+## How Private Assets Work
+
+Private assets follow a different lifecycle compared to regular tokens:
+
+| Operation | Regular Tokens | Private Assets |
+|-----------|---------------|----------------|
+| Deposit | Tokens transferred to reserve | Tokens **burned** |
+| Withdrawal | Tokens transferred from reserve | Tokens **minted** to recipient |
+| Mint Authority | Token creator | Protocol (`global_config` PDA) |
+| Supply | Fixed | Dynamic (burn/mint) |
+
+<Note>
+Since the protocol controls mint authority, the total circulating supply always matches the amount that has been deposited minus what has been withdrawn — ensuring 1:1 backing at all times.
+</Note>
+
+## Creating a Private Asset
+
+Only authorized managers can create private assets. The process involves:
+
+1. **Upload metadata** — provide a name, symbol, image, and description. Metadata is stored on IPFS via Pinata for decentralized availability.
+2. **Create the token mint** — the protocol creates an SPL token mint with `global_config` as the mint authority.
+3. **Initialize config** — a `PrivateAssetConfig` PDA is created on-chain, linking the asset to its creator (admin) and mint address.
+4. **Mint initial supply** — the specified initial amount is minted directly into the creator's private balance.
+
+## Minting to Recipients
+
+After creation, managers can mint additional tokens to any recipient using their stealth address:
+
+1. Enter the recipient's stealth address (a 64-byte public key).
+2. Specify the amount to mint.
+3. The protocol creates encrypted UTXOs and adds commitments to the Merkle tree.
+4. The recipient can then use, transfer, or withdraw the tokens privately.
+
+<Note>
+Recipients do not need to have a public token account — tokens are delivered directly to their private balance via stealth addressing.
+</Note>
+
+## Depositing Private Assets
+
+Depositing private assets works the same way as regular deposits from the user's perspective. Under the hood, the tokens are **burned** rather than transferred to a reserve account, since the protocol can mint them again on withdrawal.
+
+## Withdrawing Private Assets
+
+Withdrawals use a dedicated `withdraw_private_asset` instruction. The protocol mints the requested amount directly to the recipient's public wallet address using its mint authority, instead of transferring from a reserve.
+
+## Viewing Private Assets
+
+All created private assets are listed on the **Compliant Assets** page. The protocol automatically discovers and registers private assets, making them available as deposit/withdrawal options alongside standard tokens.
+
+## Security Considerations
+
+- **Mint authority** is held by the protocol PDA — no single party can mint tokens outside of the defined flows.
+- **On-chain config** (`PrivateAssetConfig`) immutably links each asset to its creator and mint address.
+- **IPFS metadata** ensures token information is decentralized and tamper-resistant.
+- All private asset operations go through the same zero-knowledge proof system as regular tokens.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deposit" icon="arrow-down-to-arc" href="/features/deposit">
+    Add tokens to your private balance
+  </Card>
+  <Card title="Withdraw" icon="money-bill-transfer" href="/features/withdraw">
+    Cash out privately
+  </Card>
+</CardGroup>

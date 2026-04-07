@@ -1,0 +1,253 @@
+---
+title: "FAQ"
+description: "Frequently Asked Questions about Yona Privacy Protocol"
+---
+
+## General Questions
+
+<AccordionGroup>
+
+
+  <Accordion title="Is Yona safe to use? Can I lose my funds?">
+    Yona is a non-custodial protocol, meaning you always control your funds through your wallet. The protocol uses audited Groth16 zkSNARKs cryptography and is open source for public verification. However, like any DeFi protocol, you should:
+    - Keep your wallet private key AND [signature](/faq#what-is-a-wallet-signature-and-why-is-it-critical) secure 
+    - Understand that smart contract risks exist in any blockchain protocol
+  </Accordion>
+
+  <Accordion title="How is Yona different from using a mixer?">
+    Yona is not a traditional mixer - it's a permissionless privacy layer:
+    - Uses zero-knowledge cryptography instead of mixing pools
+    - You can make multiple transactions from one deposit without losing privacy
+    - Supports swaps directly in the privacy pool
+    - More secure against timing analysis attacks
+    - Integrated with DeFi (Jupiter) for real utility
+    
+    **Fully permissionless**:
+    - Anyone can run their own relayer and earn fees
+    - Anyone can implement custom signature schemes
+    - Yona only provides the privacy layer infrastructure
+    - No central control over who can participate
+    
+    It's a complete privacy layer for DeFi, not just a mixing service.
+  </Accordion>
+
+  <Accordion title="What is a wallet signature and why is it critical?">
+    Your wallet signature is the encryption key that protects your funds in Yona:
+    
+    **How it works**:
+    1. When you first connect, you sign an authentication message with your wallet:
+    
+    ```
+    Sign this message to authenticate with Yona
+    
+    Wallet: <your-wallet-address>
+    ```
+    
+    2. This key is used to encrypt/decrypt your UTXO data on-chain
+    3. The signature is stored in your browser's localStorage
+    
+    
+    **Security warning**:
+    - **NEVER** sign this authentication message on other websites or untrusted applications
+    - Without this signature, you **cannot** decrypt your funds permanently
+    - Only sign messages starting with "Sign this message to authenticate with Yona" on the official Yona website
+    - Signing the same message on phishing sites gives attackers the ability to decrypt your funds
+  </Accordion>
+  <Accordion title="What is a 'private note' and where is it stored?">
+    Your "private note" is actually encrypted UTXO data stored on-chain. When you deposit:
+    1. Yona creates encrypted outputs containing your balance information
+    2. These encrypted outputs are stored publicly on Solana blockchain
+    3. Only **YOUR** wallet can decrypt them using a signature you create when connecting
+    4. The decryption key is derived from your wallet's signature
+  </Accordion>
+
+  <Accordion title="Can anyone trace my transactions?">
+    No. When you use Yona:
+    - Your deposits are mixed with other users' deposits in the privacy pool
+    - Withdrawals and swaps cannot be linked back to your original deposit
+    - External observers can see that *a* transaction happened, but not *who* initiated it
+    - Even if someone knows you deposited 100 USDC, they cannot track where those specific tokens went
+  </Accordion>
+  <Accordion title="My balance disappeared, what should I do?">
+    If your balance is not showing in the app, don't panic - your funds are safe on-chain. Balance display issues are very rare and usually caused by:
+    - Nullifier synchronization errors
+    - Abrupt page refresh during UTXO decoding
+    - Browser cache corruption
+    - LocalStorage data conflicts
+    
+    **Solution**:
+    1. Go to the Portfolio section on the website
+    2. Click the "Refresh" button
+    3. This will reload all your on-chain UTXOs directly from the blockchain
+    4. Your balance will be restored once the sync completes
+    
+    The refresh process re-fetches and decodes all your encrypted UTXOs from the Solana blockchain, ensuring your actual on-chain balance is correctly displayed. 
+  </Accordion>
+  <Accordion title="How long does it take to deposit/withdraw?">
+    The transaction flow is identical to a regular Solana transaction, with one additional step: zero-knowledge proof generation on the frontend. It takes 15-25 seconds for Mac M2 devices.
+
+    Note: Withdrawals and swaps use an asynchronous job queue system. During high network activity or relayer congestion, times may be longer.
+  </Accordion>
+  <Accordion title="What tokens can I use with Yona?">
+    Yona supports:
+    - **Native SOL** (automatically wrapped to WSOL)
+    - **All SPL tokens** including USDC, USDT, and other standard tokens
+    - **Any token pair** available on Jupiter for swaps
+    
+    Technically, any SPL token is supported on-chain through direct contract calls without admin approval. If a token isn't listed in the interface, it simply means we haven't added it to the frontend/relayer yet due to lack of demand.
+    
+    **Adding new token pools**: Pools can be added upon request, but pool creation makes sense only with a minimum initial deposit to ensure sufficient liquidity and cover protocol initialization costs.
+  </Accordion>
+
+</AccordionGroup>
+
+
+
+## Usage Questions
+
+<AccordionGroup>
+  <Accordion title="What's the minimum amount I can deposit?">
+    There's technically no minimum, but, very small deposits may be uneconomical due to fees
+    
+    Check current fee [Fees](/concepts/fees) structures in the app before depositing. 
+  </Accordion>
+
+  <Accordion title="Can I split my balance into multiple withdrawals?">
+    **Partially, but not directly**. Here's how UTXOs work in Yona:
+    
+    - Each transaction (deposit, swap, withdraw) creates 2 UTXOs: one with your balance, one empty (for circuit constraints)
+    - You can make multiple transactions from your total balance
+    - Each transaction spends up to 2 existing UTXOs and creates 2 new ones
+    - If you withdraw part of your balance, the remainder becomes a new UTXO (change)
+    
+    **Example**:
+    - Deposit 100 USDC → Creates 1 UTXO with 100 USDC
+    - Withdraw 40 USDC → Spends the 100 USDC UTXO, creates new 60 USDC change UTXO
+    - Withdraw 30 USDC → Spends the 60 USDC UTXO, creates new 30 USDC change UTXO
+    
+    So yes, you can make multiple withdrawals from one deposit by spending the change UTXOs.
+  </Accordion>
+
+  <Accordion title="Can I withdraw to a different address than I deposited from?">
+    Yes! This is a core privacy feature:
+    - Deposit from Address A
+    - Withdraw to Address B (or C, D, E...)
+    - No on-chain connection between the two addresses
+    
+    This breaks the transaction graph and protects your privacy.
+  </Accordion>
+
+  <Accordion title="What happens if my transaction fails?">
+    If a transaction fails:
+    - Your funds remain safe as encrypted UTXOs on-chain
+    - Your existing UTXOs are not consumed
+    - No nullifiers are created, so UTXOs remain spendable
+    - Check the error message for details
+    - You can retry the transaction
+    - Contact support if the issue persists
+    
+    Common reasons for failures:
+    - Insufficient UTXO balance for amount + fees
+    - Network congestion
+    - Invalid withdrawal address
+    - Relayer issues (for withdrawals/swaps)
+    - Stale Merkle root (outdated UTXO cache)
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Questions
+
+<AccordionGroup>
+
+
+  <Accordion title="Why is there only one relayer right now?">
+    Currently, Yona operates with a single relayer during the initial launch phase, but this is temporary:
+    
+    **Current status**:
+    - One official relayer operated by the Yona team
+    - Ensures smooth user experience during early adoption
+    - Allows us to monitor and optimize the system
+    
+    **Decentralization coming soon**:
+    - **Anyone can become a relayer** after our security audit is complete
+    - Relayers earn fees for processing transactions (incentivized participation)
+    - Multiple relayers will increase decentralization and resilience
+    
+    **Security by design**:
+    - Relayers work with cryptographic proof verification
+    - They **cannot** steal funds or access your private data
+    - They only submit verified zero-knowledge proofs to the blockchain
+    - Even a malicious relayer cannot compromise user funds
+    
+    **After audit completion**:
+    - We will publish open-source relayer implementation code
+    - Detailed setup documentation and guides
+    - Public relayer registry for users to choose from
+    - Economic incentives for running reliable relayer nodes
+    
+    This approach ensures security first, then progressive decentralization.
+  </Accordion>
+
+  <Accordion title="How does Yona integrate with Jupiter?">
+    Yona uses Jupiter's aggregator for swaps:
+    - Your swap happens inside the privacy pool
+    - Jupiter finds the best route across DEXs
+    - The swap is executed atomically
+    - External observers see a Jupiter swap, but not who initiated it
+    
+    This combines DeFi liquidity with privacy protection.
+  </Accordion>
+
+
+
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="My transaction is stuck, what do I do?">
+    Steps to resolve:
+    1. Check Solana network status (is there congestion?)
+    2. Verify your wallet has SOL for fees
+    3. Wait 1-2 minutes and refresh the page
+    4. Try clearing browser cache
+    5. Contact support on [Discord](https://discord.gg/yonaprivacy) with transaction details
+    
+    Your funds are safe even if the interface appears stuck.
+  </Accordion>
+
+  <Accordion title="The app says 'insufficient balance' but I have funds">
+    Common causes:
+    - **Important**: Trying to spend more than a single note contains
+    - **Balance is incorrect**, see [My balance disappeared](/faq#my-balance-disappeared-what-should-i-do) for refresh instructions
+    - Not accounting for relayer fees and network fees
+    - Cache/sync issues with the interface
+  </Accordion>
+
+  <Accordion title="How do I report a bug or get support?">
+    For support:
+    - **Discord**: [Join our community](https://discord.gg/yonaprivacy)
+    - **Twitter**: [@YonaPrivacy](https://x.com/YonaPrivacy)
+    
+    When reporting issues, include:
+    - What you were trying to do
+    - Error messages (if any)
+    - Transaction signature (if applicable)
+    - Job ID (for relayer transactions from console logs)
+    - **Never** share your wallet private key or signature
+  </Accordion>
+</AccordionGroup>
+
+## Still Have Questions?
+
+Can't find what you're looking for? 
+
+<CardGroup cols={2}>
+  <Card title="Join Discord" icon="discord" href="https://discord.gg/yonaprivacy">
+    Get help from the community and team
+  </Card>
+  <Card title="Read the Docs" icon="twitter" href="https://x.com/YonaPrivacy"> 
+    Get the latest updates and announcements 
+  </Card>
+
+</CardGroup>

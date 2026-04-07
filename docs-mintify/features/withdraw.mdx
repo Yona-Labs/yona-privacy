@@ -1,0 +1,59 @@
+---
+title: "Withdrawals"
+description: "Cash out tokens anonymously"
+---
+
+## Overview
+
+Withdrawals let you move tokens from your private notes to any Solana address. The key privacy feature is that no one can link the withdrawal back to your original deposit. You can withdraw to your own address or send to anyone else - either way, it's completely private.
+
+## How to Withdraw
+
+Select which private notes to spend (up to 2), enter the recipient wallet address, set the amount you want to withdraw (remainder stays as a new private note), generate the zero-knowledge proof (3-7 seconds), and confirm the transaction.
+
+For example, if you have 25 USDC available across 2 notes, you can withdraw 20 USDC with a 0.3% fee (0.06 USDC), leaving 4.94 USDC as a new private note.
+
+<Warning>
+Double-check the recipient address carefully! Transactions cannot be reversed.
+</Warning>
+
+## Privacy is Critical
+
+**Don't withdraw immediately after depositing!** This is the most important rule. Wait at least a few hours, ideally days or weeks, to let other users deposit in between. This breaks the time correlation and protects your privacy.
+
+Avoid these patterns: depositing 100 USDC and withdrawing 100 USDC immediately (bad), or always depositing on Monday and withdrawing on Friday (predictable). Instead, deposit 100 USDC, wait a day, and withdraw 73 USDC (good), or deposit multiple times, wait, and withdraw different amounts (best).
+
+## Fees
+
+Expect to pay ~0.1-0.5% protocol fee on withdrawal amount, ~0.000005 SOL network fee, and optionally ~0.1% relayer fee if using a relayer service for maximum privacy.
+
+## Using a Relayer
+
+Relayers can submit transactions on your behalf for complete anonymity. You don't need to use your own wallet, no SOL is needed, and your IP address is hidden. There's a small additional fee, but relayers cannot steal your funds - they only submit the transaction you created.
+
+## Withdrawing SOL
+
+For native SOL withdrawals, the protocol uses Wrapped SOL (WSOL) internally and automatically unwraps it so the recipient receives native SOL.
+
+## Troubleshooting
+
+**Proof Generation Failed?** Check that your notes haven't been spent already, verify token types match, or try a different browser.
+
+**Transaction Failed?** Check you have enough balance in your notes, verify the recipient address format, or the network may be congested.
+
+**Note Already Spent?** You may have already used it in a previous withdrawal. Check your transaction history and use a different note.
+
+## Security Tips
+
+Always verify the recipient address carefully, use relayers for maximum privacy, don't rush your withdrawals, and backup any change notes immediately after the transaction.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Private Swaps" icon="arrows-rotate" href="/features/swap">
+    Exchange tokens privately
+  </Card>
+  <Card title="Privacy Tips" icon="user-secret" href="/concepts/privacy">
+    Learn more about privacy
+  </Card>
+</CardGroup>

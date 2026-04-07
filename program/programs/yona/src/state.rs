@@ -26,6 +26,13 @@ pub struct NullifierAccount {
     pub bump: u8,
 }
 
+#[account]
+pub struct PrivateAssetConfig {
+    pub admin: Pubkey,
+    pub mint: Pubkey,
+    pub bump: u8,
+}
+
 #[account(zero_copy)]
 pub struct MerkleTreeAccount {
     pub authority: Pubkey,

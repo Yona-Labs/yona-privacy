@@ -1,0 +1,139 @@
+---
+title: 'Technical Architecture'
+description: 'Deep dive into Yona protocol architecture, smart contract design, and key technical features'
+---
+
+
+Yona implements a **UTXO-based privacy model** with **Groth16 zk-SNARKs** on Solana, providing strong anonymity guarantees while maintaining full on-chain verifiability. 
+
+Program uses a modified version of the Tornado Nova circom circuits, adapted for Solana's architecture. 
+A modified version of the circom is used to create a dual-token circuit.
+
+The circom schemes are currently undergoing a security audit, and we will publish details soon.
+
+
+**Program:** [`yonaMBw7KLYvQSspboB2GGAt5EsQqV28dZZasKhKGqC`](https://orb.helius.dev/account/yonaMBw7KLYvQSspboB2GGAt5EsQqV28dZZasKhKGqC)
+
+Code for the program is open source and available [here](https://github.com/Yona-Labs/yona-privacy-app/tree/main/program/programs/zert).
+
+---
+ 
+## UTXO Model
+
+Yona uses a **Unspent Transaction Output** model similar to Bitcoin/Zcash:
+
+### Structure
+
+```typescript
+interface UTXO {
+    amount: bigint;        // Token amount
+    mintAddress: string;   // SPL token mint
+    blinding: bigint;      // Random value for privacy
+    publicKey: bigint;     // Owner's public key (BN254 curve)
+}
+
+Commitment = Hash(amount, mintAddress, blinding, publicKey)
+Nullifier = Hash(commitment, privateKey, merkleProofPathIndex)
+```
+
+#### Privacy Properties
+
+- **Hiding:** Commitments reveal nothing about contents
+- **Binding:** Cannot change UTXO after commitment
+- **Unlinkability:** Cannot link commitments to nullifiers without private key
+
+#### Transaction Logic
+
+Every instruction consumes **2 input UTXOs** and creates **2 output UTXOs**:
+
+---
+
+## Public Inputs & Data Integrity
+
+All transaction data is cryptographically bound to the zero-knowledge proof through **10 public inputs**. This means no transaction data can be modified without invalidating the proof:
+
+### Public Inputs to Proof Verification
+
+```typescript
+publicInputs = [
+    root,                    // Merkle tree root
+    publicAmount0,           // Token A amount (deposit/withdraw)
+    publicAmount1,           // Token B amount (for swaps)
+    extDataHash,            // Hash of external data
+    mintAddressA,           // SPL token mint A
+    mintAddressB,           // SPL token mint B
+    inputNullifier[0],      // First spent UTXO nullifier
+    inputNullifier[1],      // Second spent UTXO nullifier
+    outputCommitment[0],    // First new UTXO commitment
+    outputCommitment[1]     // Second new UTXO commitment
+]
+```
+
+### External Data Hash
+
+The `extDataHash` itself is computed from additional transaction parameters:
+
+```typescript
+extDataHash = Hash(
+    recipient,           // Withdrawal address
+    extAmount,          // External amount
+    encryptedOutput,    // Encrypted UTXO data
+    fee,               // Relayer fee
+    feeRecipient,      // Fee collector address
+    mintAddressA,      // Token mint A
+    mintAddressB       // Token mint B
+)
+```
+
+**Security Guarantee:** Since all this data is part of the proof's public inputs, any attempt to modify transaction parameters (amounts, recipients, fees, nullifiers, commitments) will cause proof verification to fail. This ensures complete data integrity without revealing private information.
+
+## Program Components 
+
+The Yona program serves as the core verification system that stores all private transaction data and validates zero-knowledge proofs. It maintains the complete state of the privacy pool, including all commitments and nullifiers, while ensuring that only valid proofs can modify this state.
+
+### Merkle Tree State
+- **Height:** 26 levels
+- **Capacity:** 67 million commitments
+- **Structure:** Sparse binary tree with Poseidon hashing
+- **Purpose:** Stores cryptographic commitments of all UTXOs without revealing amounts or owners
+
+### Nullifier Registry
+- **Function:** Prevents double-spending using [Light Protocol's ZK Compression](https://www.zkcompression.com/)
+- **Mechanism:** Each spent UTXO generates a unique nullifier stored as compressed state
+- **Rent-Free:** Nullifiers are stored without rent-exempt balance requirements thanks to ZK compression
+
+### Proof Verification System
+- **Provider:** Light Protocol's Groth16 verifier
+- **Curve:** BN254 elliptic curve
+- **Proof Size:** 256 bytes (compressed)
+
+
+## Private UTXO Storage
+
+Yona stores all private UTXOs in on-chain events with highly optimized compression. This approach allows efficient retrieval through the indexer while minimizing on-chain storage costs.
+
+The protocol achieves exceptional efficiency through multiple compression techniques:
+
+#### Commitments Compression
+
+We store encrypted Commitments in on-chain events using highly optimized serialization:
+
+- **Minimal Serialization:** Data is compressed to the smallest possible size using custom binary packing
+- **Dual UTXO Optimization:** Two UTXOs are packed into a single on-chain record, reducing storage costs by 50%
+- **Partial Mint Storage** 
+
+**Result:** Each commitment entry uses only ~100 bytes instead of traditional 200+ bytes
+
+#### Data Retrieval
+
+Private UTXO data is stored in Solana events and can be efficiently retrieved through the Yona indexer. The indexer monitors on-chain events, decrypts relevant UTXOs for users, and provides fast access to transaction history without requiring full chain scanning.
+
+<Note>
+If needed, you can send transactions directly through the local frontend with any custom `encryptedOutput` format that suits your requirements.
+</Note>
+
+---
+
+## Audit Status
+
+Protocol is **experimental** and under active development. No formal audit completed yet. Use with caution.

@@ -104,11 +104,94 @@ pub mod yona {
         output_state_tree_index: u8,
     ) -> Result<()> {
         instructions::swap::handler(
-            ctx, 
-            proof, 
-            ext_data_minified, 
-            encrypted_output, 
+            ctx,
+            proof,
+            ext_data_minified,
+            encrypted_output,
             jupiter_swap_data,
+            light_proof,
+            nullifier0_address_tree_info,
+            nullifier1_address_tree_info,
+            output_state_tree_index,
+        )
+    }
+
+    pub fn transact<'info>(
+        ctx: Context<'_, '_, '_, 'info, Transact<'info>>,
+        proof: CompressedProof,
+        ext_data_minified: ExtDataMinified,
+        encrypted_output: Vec<u8>,
+        light_proof: ValidityProof,
+        nullifier0_address_tree_info: PackedAddressTreeInfo,
+        nullifier1_address_tree_info: PackedAddressTreeInfo,
+        output_state_tree_index: u8,
+    ) -> Result<()> {
+        instructions::transact::handler(
+            ctx,
+            proof,
+            ext_data_minified,
+            encrypted_output,
+            light_proof,
+            nullifier0_address_tree_info,
+            nullifier1_address_tree_info,
+            output_state_tree_index,
+        )
+    }
+
+    pub fn initialize_private_asset(
+        ctx: Context<InitializePrivateAsset>,
+        mint: Pubkey,
+    ) -> Result<()> {
+        instructions::initialize_private_asset::handler(ctx, mint)
+    }
+
+    pub fn create_asset(
+        ctx: Context<CreateAsset>,
+        mint: Pubkey,
+        amount: u64,
+        output_commitments: [[u8; 32]; 2],
+        encrypted_output: Vec<u8>,
+    ) -> Result<()> {
+        instructions::create_asset::handler(ctx, mint, amount, output_commitments, encrypted_output)
+    }
+
+    pub fn deposit_private_asset<'info>(
+        ctx: Context<'_, '_, '_, 'info, DepositPrivateAsset<'info>>,
+        proof: CompressedProof,
+        ext_data_minified: ExtDataMinified,
+        encrypted_output: Vec<u8>,
+        light_proof: ValidityProof,
+        nullifier0_address_tree_info: PackedAddressTreeInfo,
+        nullifier1_address_tree_info: PackedAddressTreeInfo,
+        output_state_tree_index: u8,
+    ) -> Result<()> {
+        instructions::deposit_private_asset::handler(
+            ctx,
+            proof,
+            ext_data_minified,
+            encrypted_output,
+            light_proof,
+            nullifier0_address_tree_info,
+            nullifier1_address_tree_info,
+            output_state_tree_index,
+        )
+    }
+
+    pub fn withdraw_private_asset<'info>(
+        ctx: Context<'_, '_, '_, 'info, WithdrawPrivateAsset<'info>>,
+        proof: CompressedProof,
+        ext_data_minified: ExtDataMinified,
+        encrypted_output: Vec<u8>,
+        light_proof: ValidityProof,
+        nullifier0_address_tree_info: PackedAddressTreeInfo,
+        nullifier1_address_tree_info: PackedAddressTreeInfo,
+        output_state_tree_index: u8,
+    ) -> Result<()> {
+        instructions::withdraw_private_asset::handler(
+            ctx,
+            proof,
+            ext_data_minified,
+            encrypted_output,
             light_proof,
             nullifier0_address_tree_info,
             nullifier1_address_tree_info,

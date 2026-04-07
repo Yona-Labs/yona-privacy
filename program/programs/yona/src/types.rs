@@ -28,6 +28,17 @@ pub struct SwapEvent {
     pub output_amount: u64,
 }
 
+#[event]
+pub struct TransferEvent {
+    pub input_mint: Pubkey,
+}
+
+#[event]
+pub struct CreateAssetEvent {
+    pub mint: Pubkey,
+    pub amount: u64,
+}
+
 
 // all public inputs needs to be in big endian format
 // Compressed proof format - saves transaction size

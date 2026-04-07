@@ -1,0 +1,70 @@
+---
+title: "Private Swaps"
+description: "Exchange tokens privately using Jupiter integration"
+---
+
+
+## Technical Details
+
+The protocol enables **completely private token swaps** with zero price slippage through Jupiter integration:
+
+### Atomic Execution
+
+1. **Input UTXOs:** User selects 2 UTXOs to spend (e.g., 10 USDC and 3 SOL)
+2. **Jupiter Quote:** Frontend fetches best route
+3. **Atomic Execution in one Instruction:**
+   ```
+   Withdraw Input → Jupiter Swap → Shield Output
+   ```
+4. **Zero-Knowledge Proof:** Proves ownership of input UTXOs without revealing which UTXOs
+5. **Output Creation:** New UTXOs created with swapped assets (e.g., 7 USDC and 1 SOL)
+
+### Privacy Guarantees
+
+- **Anonymous Trading:** No one can identify the buyer; all purchases are executed by the contract, protecting against copy-trading and position disclosure
+- **Buyer is anonymous:** Buyer is anonymous because it uses Jupiter swap and it is not possible to trace the buyer by the IP address
+- **No Address Linkage:** Deposit address ≠ Withdrawal address
+- **No Timing Analysis:** Can wait arbitrary time between operations
+
+## Making a Swap
+
+Choose your source token (what you have) and destination token (what you want). Any tokens supported by Jupiter work. Enter the amount to swap - you can swap a partial balance with the remainder staying as a private note.
+
+For example, swapping 3.0 SOL might give you ~300 USDC at current rates, with 0.5 SOL remaining as a private note.
+
+### Configure Slippage
+
+Set how much price movement you'll accept. Use 0.5-1% for stable pairs and safe trades, or 2-5% for volatile or illiquid pairs.
+
+<Warning>
+Higher slippage means potentially worse price but better chance of execution success.
+</Warning>
+
+## Fees
+
+Expect to pay ~0.3% protocol fee on the swap amount, ~0.1-0.3% Jupiter fees (varies by route), and ~0.000005 SOL network fee.
+
+Example: Swapping 3.0 SOL to USDC at $100/SOL gives you ~$300 expected output, minus ~$0.90 protocol fee and ~$0.30 Jupiter fees, for a total of ~$299 received.
+
+## Privacy Tips
+
+For maximum privacy, don't swap immediately after depositing, vary your amounts to avoid patterns, wait for other protocol activity, and use multiple smaller swaps instead of one large swap if dealing with significant amounts.
+
+## Troubleshooting
+
+**Swap Failed?** Try increasing slippage tolerance, choosing a different token pair, or checking liquidity on Jupiter first.
+
+**Proof Generation Error?** Verify your notes haven't been spent, check that amounts and tokens are correct, or try a different browser (Chrome or Firefox recommended).
+
+**Price Impact Too High?** If price impact exceeds 5%, consider splitting into smaller swaps, check current liquidity conditions, or wait for better market conditions.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deposits" icon="arrow-down" href="/features/deposit">
+    Add funds to privacy pool
+  </Card>
+  <Card title="Withdrawals" icon="arrow-up" href="/features/withdraw">
+    Cash out anonymously
+  </Card>
+</CardGroup>

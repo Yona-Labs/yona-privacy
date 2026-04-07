@@ -1,0 +1,59 @@
+---
+title: "What is Yona?"
+description: "We enable private trustless DeFi on Solana."
+---
+
+
+Yona is a privacy protocol on Solana that lets you shield SOL and any SPL token into our privacy pool and trade any pair privately on Jupiter. 
+Any action done through our protocol is fully untraceable by any external observer. 
+They will see that the Jupiter swap happened, but they will not know who executed the trade.
+
+ 
+Using zero-knowledge proofs, you can prove a transaction is valid without exposing amounts or participants.
+It only relies on ZK cryptography, no trusted parties, no questionable TEEs.
+
+
+
+## How It Works
+
+<Steps>
+  <Step title="Deposit Tokens">
+    Send tokens to the protocol and receive a private note. This note represents your balance but doesn't reveal any information on-chain.
+  </Step>
+  <Step title="Make Private Transactions">
+    Use your notes to transact privately. The protocol verifies you have the funds without revealing which deposit you're spending from.
+  </Step>
+  <Step title="Withdraw or Swap">
+    Withdraw to any address or swap to different tokens. The recipient can't trace back to your original deposit.
+  </Step>
+</Steps>
+
+
+## Supported Tokens
+
+<CardGroup cols={3}>
+  <Card title="Native SOL" icon="coins">
+    Automatic WSOL wrapping/unwrapping
+  </Card>
+  <Card title="All SPL Tokens" icon="layer-group">
+    USDC, USDT, and any standard token
+  </Card>
+  <Card title="Cross-Token Swaps" icon="shuffle">
+    Powered by Jupiter Aggregator
+  </Card>
+</CardGroup>
+
+
+## Security & Trust
+
+- **Non-custodial**: You always control your funds
+- **Audited Cryptography**: Uses industry-standard Groth16 zkSNARKs
+- **Open Source**: All code is publicly verifiable
+
+<Card
+  title="Learn More"
+  icon="book"
+  href="/concepts/how-it-works"
+>
+  Dive deeper into how Yona protects your privacy
+</Card>

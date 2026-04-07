@@ -1,0 +1,76 @@
+---
+title: "Fees"
+description: "Understanding Yona's fee structure and slippage handling"
+---
+
+## Important Note on Fee Structure
+
+**Yona protocol itself does not charge or collect any fees.** All withdrawal and swap fees go directly to independent relayer operators, not to the protocol.
+
+
+
+
+## Nullifiers
+
+Each private transaction requires 2 nullifiers to prevent double-spending.
+
+**Nullifiers are rent-free** thanks to [Light Protocol's ZK Compression](https://www.zkcompression.com/). Unlike traditional Solana accounts that require rent-exempt balances, compressed accounts store state as call data on Solana's ledger without per-account rent costs.
+
+This means:
+- No 0.0019 SOL nullifier initialization cost per transaction
+- No accumulating rent costs for nullifier storage
+- Nullification happens through compressed state queues processed by Forester nodes
+
+
+
+
+## Deposit Fees
+
+**0%** of the deposited amount. No additional costs.
+
+## Withdrawal Fees 
+
+**0.3%** of the withdrawn amount goes to the relayer.
+
+## Swap Fees
+
+The relayer charges **0% - 0.3%** fees on swaps. When you perform a private swap through our protocol, the relayer doesn't take a percentage of your input amount, but takes the difference between minimum amount out and actual output.
+
+### Slippage Mechanism
+
+However, due to the technical constraints of fully private swaps in the UTXO model, we implement a unique slippage handling mechanism:
+
+#### How It Works
+
+When you execute a swap with a **0.3% slippage tolerance**, here's what happens:
+
+1. **You receive the minimum amount out** - Your transaction is guaranteed to complete, and you'll receive at least the minimum output amount based on the slippage tolerance
+2. **Relayer takes the remaining tokens** - Any difference between the actual swap output and the minimum amount goes to the relayer
+3. **Relayer absorbs the slippage risk** - By taking the remaining tokens, the relayer assumes all slippage risks
+
+#### Why This Design?
+
+This mechanism is **necessary for UTXO-based privacy**. In a UTXO system with zero-knowledge proofs, it's technically impossible to create a fully private swap where the exact output amount is unknown at proof generation time.
+
+The alternative approaches would either:
+- Reveal transaction information, breaking privacy
+- Require trusted parties or complex multi-round interactions
+- Make swaps impossible in certain market conditions
+
+By guaranteeing you the minimum amount and absorbing the difference, we enable truly private swaps while maintaining the security guarantees of the UTXO model.
+
+#### Example
+
+If you swap 100 SOL for USDC with 0.3% slippage:
+- Expected output: 10,000 USDC
+- Minimum guaranteed: 9,970 USDC (0.3% slippage)
+- Actual output: 9,985 USDC
+- **You receive**: 9,970 USDC
+- **Relayer receives**: 15 USDC (the slippage buffer)
+
+In market conditions where slippage works in your favor, the relayer captures that upside. In conditions where slippage exceeds the tolerance, the relayer absorbs those losses.
+
+<Note>
+This design ensures your swaps are always private, predictable, and complete without revealing any transaction details on-chain.
+</Note>
+

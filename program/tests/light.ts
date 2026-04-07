@@ -25,7 +25,8 @@ import {
 import { Yona } from "../target/types/yona";
 import { LightWasm, WasmFactory } from "@lightprotocol/hasher.rs";
 import { MerkleTree } from "./lib/merkle_tree";
-import { buildDepositInstruction, buildWithdrawInstruction, buildSwapInstruction, sendTransactionWithALT, createSwapExtDataMinified, buildDepositWithLightNullifiersInstruction, buildWithdrawWithLightNullifiersInstruction, buildSwapWithLightNullifiersInstruction } from "./instructions";
+import { buildDepositInstruction, buildWithdrawInstruction, buildSwapInstruction, sendTransactionWithALT, createSwapExtDataMinified, buildDepositWithLightNullifiersInstruction, buildWithdrawWithLightNullifiersInstruction, buildSwapWithLightNullifiersInstruction, buildTransactWithLightNullifiersInstruction } from "./instructions";
+import { Keypair as UtxoKeypair } from "./lib/keypair";
 import { Utxo } from "./lib/utxo";
 import { DEFAULT_HEIGHT, FIELD_SIZE, ROOT_HISTORY_SIZE, ZERO_BYTES, DEPOSIT_FEE_RATE, WITHDRAW_FEE_RATE } from "./lib/constants";
 import { getExtDataHash, getSwapExtDataHash, publicKeyToFieldElement } from "./lib/utils";
@@ -64,6 +65,12 @@ describe("localnet", () => {
   let depositedUtxo: Utxo;
   let withdrawOutputUtxo: Utxo;
   let swapOutputUtxoMintB: Utxo;
+  let deposit2Utxo: Utxo;
+  let consolidatedUtxo: Utxo;
+  let transferredUtxo: Utxo;
+  let userBKeypair: UtxoKeypair;
+  let userBWithdrawChangeUtxo: Utxo;
+  let userBDepositUtxo: Utxo;
   let altAddress: PublicKey;
   let jupiterAltAddress: PublicKey | null = null;
   let lightRPC: Rpc;
@@ -137,7 +144,7 @@ describe("localnet", () => {
 
     // Check if globalConfig already exists
     const globalConfigInfo = await connection.getAccountInfo(globalConfig);
-
+    
     if (globalConfigInfo) {
       console.log("GlobalConfig already initialized, skipping...");
       console.log("Global Config:", globalConfig.toString());
@@ -320,9 +327,9 @@ describe("localnet", () => {
     // Create reserve token accounts if they don't exist
     const reserveAccountInfo = await connection.getAccountInfo(reserveTokenAccount);
     const reserveAccountInfoB = await connection.getAccountInfo(reserveTokenAccountB);
-
+    
     const createAtaTx = new Transaction();
-
+    
     if (!reserveAccountInfo) {
       const createAtaIx = createAssociatedTokenAccountInstruction(
         admin.publicKey,
@@ -332,7 +339,7 @@ describe("localnet", () => {
       );
       createAtaTx.add(createAtaIx);
     }
-
+    
     if (!reserveAccountInfoB) {
       const createAtaIxB = createAssociatedTokenAccountInstruction(
         admin.publicKey,
@@ -342,7 +349,7 @@ describe("localnet", () => {
       );
       createAtaTx.add(createAtaIxB);
     }
-
+    
     if (createAtaTx.instructions.length > 0) {
       await sendAndConfirmTransaction(connection, createAtaTx, [admin], {});
     }
@@ -458,7 +465,7 @@ describe("localnet", () => {
     );
     console.log("Deposit with Light Protocol nullifiers successful!");
 
-
+    
 
     // Update merkle tree
     for (const commitment of depositOutputCommitments) {
@@ -501,7 +508,7 @@ describe("localnet", () => {
       depositedUtxo,
       new Utxo({ lightWasm, mintAddress: mintAddressA.toString() }),
     ];
-
+    
     const inputsSum = withdrawInputs.reduce((sum, x) => sum.add(x.amount), new BN(0));
     const publicAmount0 = new BN(-withdrawalAmount).sub(withdrawalFee).add(FIELD_SIZE).mod(FIELD_SIZE);
     const remainingAmount = inputsSum.sub(new BN(withdrawalAmount)).sub(withdrawalFee);
@@ -543,6 +550,23 @@ describe("localnet", () => {
     const withdrawOutputCommitments = await Promise.all(withdrawOutputs.map(x => x.getCommitment()));
     const withdrawRoot = globalMerkleTree.root();
     const withdrawExtDataHash = getExtDataHash(withdrawExtData);
+
+    // Debug: Check on-chain tree state before withdraw
+    const [treeAccount] = PublicKey.findProgramAddressSync(
+      [Buffer.from("merkle_tree")],
+      program.programId
+    );
+    const treeAccountData = await program.account.merkleTreeAccount.fetch(treeAccount);
+    const onChainRoot = Buffer.from(treeAccountData.root).toString('hex');
+    const withdrawRootHex = Buffer.from(withdrawRoot).toString('hex');
+    
+    console.log("\n=== Withdraw Root Debug ===");
+    console.log("On-chain current root:", onChainRoot);
+    console.log("Local withdraw root:", withdrawRootHex);
+    console.log("Roots match:", onChainRoot === withdrawRootHex);
+    console.log("On-chain next_index:", treeAccountData.nextIndex.toString());
+    console.log("Local tree next_index:", globalMerkleTree._layers[0].length);
+    console.log("Root history (first 5):", treeAccountData.rootHistory.slice(0, 5).map((r: any) => Buffer.from(r).toString('hex')));
 
     const withdrawInput: ProofInput = {
       root: withdrawRoot,
@@ -872,7 +896,7 @@ describe("localnet", () => {
     console.log("Attempting double-spend with same nullifier...");
     let transactionSucceeded = false;
     let errorMessage = "";
-
+    
     try {
       const withdrawTx = await buildWithdrawWithLightNullifiersInstruction(
         program,
@@ -891,14 +915,14 @@ describe("localnet", () => {
         [altAddress],
         1400000
       );
-
+      
       transactionSucceeded = true;
     } catch (error: any) {
       errorMessage = error.message;
       console.log("Double-spend correctly rejected!");
       console.log("Error:", errorMessage);
     }
-
+    
     // Verify the transaction was rejected
     expect(transactionSucceeded).to.be.false;
 
@@ -911,6 +935,784 @@ describe("localnet", () => {
         msg.includes("error") ||
         msg.includes("NullifierAlreadyExists")
       );
+    }
+  });
+
+  // ============================================================
+  // Transact tests: consolidation, transfer, and recipient withdraw
+  // ============================================================
+
+  it("Deposit #2 (for consolidation test)", async () => {
+    const depositAmount = 30000;
+    const depositFee = new BN(calculateDepositFee(depositAmount));
+
+    const reserveTokenAccount = getAssociatedTokenAddressSync(
+      mintAddressA,
+      globalConfig,
+      true
+    );
+
+    const depositExtData: ExtData = {
+      recipient: reserveTokenAccount,
+      extAmount: new BN(depositAmount),
+      encryptedOutput: Buffer.from("2"),
+      fee: depositFee,
+      feeRecipient: getAssociatedTokenAddressSync(mintAddressA, feeRecipient.publicKey, true),
+      mintAddressA: mintAddressA,
+      mintAddressB: mintAddressA,
+    };
+
+    // Use the same keypair as withdrawOutputUtxo so user A owns both UTXOs
+    const userAKeypair = withdrawOutputUtxo.keypair;
+
+    const depositInputs = [
+      new Utxo({ lightWasm, mintAddress: mintAddressA.toString() }),
+      new Utxo({ lightWasm, mintAddress: mintAddressA.toString() }),
+    ];
+
+    const publicAmount = depositExtData.extAmount.sub(depositFee);
+    const publicAmountNumber = publicAmount.add(FIELD_SIZE).mod(FIELD_SIZE);
+    const outputAmount = publicAmountNumber.toString();
+
+    const depositOutputs = [
+      new Utxo({
+        lightWasm,
+        amount: outputAmount,
+        keypair: userAKeypair,
+        index: globalMerkleTree._layers[0].length,
+        mintAddress: mintAddressA.toString()
+      }),
+      new Utxo({
+        lightWasm,
+        amount: 0,
+        keypair: userAKeypair,
+        mintAddress: mintAddressA.toString()
+      })
+    ];
+
+    const depositInputMerklePathIndices = depositInputs.map(() => 0);
+    const depositInputMerklePathElements = depositInputs.map(() => {
+      return [...new Array(globalMerkleTree.levels).fill(0)];
+    });
+
+    const depositInputNullifiers = await Promise.all(depositInputs.map(x => x.getNullifier()));
+    const depositOutputCommitments = await Promise.all(depositOutputs.map(x => x.getCommitment()));
+    const depositRoot = globalMerkleTree.root();
+    const depositExtDataHash = getExtDataHash(depositExtData);
+
+    const depositInput: ProofInput = {
+      root: depositRoot,
+      inputNullifier: depositInputNullifiers,
+      outputCommitment: depositOutputCommitments,
+      publicAmount0: publicAmountNumber.toString(),
+      publicAmount1: "0",
+      extDataHash: depositExtDataHash,
+      mintAddress0: publicKeyToFieldElement(mintAddressA),
+      mintAddress1: publicKeyToFieldElement(mintAddressA),
+      inAmount: depositInputs.map(x => x.amount.toString(10)),
+      inMintAddress: depositInputs.map(x => x.mintAddress),
+      inPrivateKey: depositInputs.map(x => x.keypair.privkey),
+      inBlinding: depositInputs.map(x => x.blinding.toString(10)),
+      inPathIndices: depositInputMerklePathIndices,
+      inPathElements: depositInputMerklePathElements,
+      outAmount: depositOutputs.map(x => x.amount.toString(10)),
+      outMintAddress: depositOutputs.map(x => x.mintAddress),
+      outPubkey: depositOutputs.map(x => x.keypair.pubkey),
+      outBlinding: depositOutputs.map(x => x.blinding.toString(10)),
+    };
+
+    const depositProofResult = await prove(depositInput, keyBasePath);
+    const depositProofInBytes = parseProofToBytesArray(depositProofResult.proof, true);
+    const depositInputsInBytes = parseToBytesArray(depositProofResult.publicSignals);
+
+    const depositProofToSubmit: ProofToSubmit = {
+      proofA: depositProofInBytes.proofA,
+      proofB: depositProofInBytes.proofB.flat(),
+      proofC: depositProofInBytes.proofC,
+      root: depositInputsInBytes[0],
+      publicAmount0: depositInputsInBytes[1],
+      publicAmount1: depositInputsInBytes[2],
+      extDataHash: depositInputsInBytes[3],
+      inputNullifiers: [depositInputsInBytes[6], depositInputsInBytes[7]],
+      outputCommitments: [depositInputsInBytes[8], depositInputsInBytes[9]],
+    };
+
+    const depositTx = await buildDepositWithLightNullifiersInstruction(
+      program,
+      depositProofToSubmit,
+      depositExtData,
+      admin.publicKey,
+      mintAddressA,
+      lightRPC
+    );
+
+    await sendTransactionWithALT(
+      connection,
+      depositTx,
+      admin,
+      [],
+      [altAddress],
+      1400000
+    );
+    console.log("Deposit #2 successful!");
+
+    for (const commitment of depositOutputCommitments) {
+      globalMerkleTree.insert(commitment);
+    }
+
+    deposit2Utxo = depositOutputs[0];
+    console.log("deposit2Utxo amount:", deposit2Utxo.amount.toString());
+  });
+
+  it("Transact - Consolidate two UTXOs into one", async () => {
+    // User A has: withdrawOutputUtxo + deposit2Utxo
+    // After consolidation: single UTXO with combined amount
+
+    const userAKeypair = withdrawOutputUtxo.keypair;
+    const totalAmount = withdrawOutputUtxo.amount.add(deposit2Utxo.amount);
+
+    // extAmount = 0, fee = 0 — no tokens enter/leave the pool
+    const transactExtData: ExtData = {
+      recipient: admin.publicKey,
+      extAmount: new BN(0),
+      encryptedOutput: Buffer.from("consolidate"),
+      fee: new BN(0),
+      feeRecipient: feeRecipient.publicKey,
+      mintAddressA: mintAddressA,
+      mintAddressB: mintAddressA,
+    };
+
+    const inputs = [withdrawOutputUtxo, deposit2Utxo];
+
+    // Build Merkle paths for both inputs
+    const inputMerklePathIndices: number[] = [];
+    const inputMerklePathElements: string[][] = [];
+
+    for (const input of inputs) {
+      if (input.amount.gt(new BN(0))) {
+        const commitment = await input.getCommitment();
+        input.index = globalMerkleTree.indexOf(commitment);
+        if (input.index === -1) input.index = 0;
+        inputMerklePathIndices.push(input.index);
+        inputMerklePathElements.push(globalMerkleTree.path(input.index).pathElements);
+      } else {
+        inputMerklePathIndices.push(0);
+        inputMerklePathElements.push(new Array(globalMerkleTree.levels).fill(0));
+      }
+    }
+
+    const outputs = [
+      new Utxo({
+        lightWasm,
+        amount: totalAmount.toString(),
+        keypair: userAKeypair,
+        index: globalMerkleTree._layers[0].length,
+        mintAddress: mintAddressA.toString(),
+      }),
+      new Utxo({
+        lightWasm,
+        amount: 0,
+        keypair: userAKeypair,
+        mintAddress: mintAddressA.toString(),
+      }),
+    ];
+
+    const inputNullifiers = await Promise.all(inputs.map(x => x.getNullifier()));
+    const outputCommitments = await Promise.all(outputs.map(x => x.getCommitment()));
+    const root = globalMerkleTree.root();
+    const extDataHash = getExtDataHash(transactExtData);
+
+    const proofInput: ProofInput = {
+      root,
+      inputNullifier: inputNullifiers,
+      outputCommitment: outputCommitments,
+      publicAmount0: "0",
+      publicAmount1: "0",
+      extDataHash,
+      mintAddress0: publicKeyToFieldElement(mintAddressA),
+      mintAddress1: publicKeyToFieldElement(mintAddressA),
+      inAmount: inputs.map(x => x.amount.toString(10)),
+      inMintAddress: inputs.map(x => x.mintAddress),
+      inPrivateKey: inputs.map(x => x.keypair.privkey),
+      inBlinding: inputs.map(x => x.blinding.toString(10)),
+      inPathIndices: inputMerklePathIndices,
+      inPathElements: inputMerklePathElements,
+      outAmount: outputs.map(x => x.amount.toString(10)),
+      outMintAddress: outputs.map(x => x.mintAddress),
+      outPubkey: outputs.map(x => x.keypair.pubkey),
+      outBlinding: outputs.map(x => x.blinding.toString(10)),
+    };
+
+    const proofResult = await prove(proofInput, keyBasePath);
+    const proofInBytes = parseProofToBytesArray(proofResult.proof, true);
+    const inputsInBytes = parseToBytesArray(proofResult.publicSignals);
+
+    const proofToSubmit: ProofToSubmit = {
+      proofA: proofInBytes.proofA,
+      proofB: proofInBytes.proofB.flat(),
+      proofC: proofInBytes.proofC,
+      root: inputsInBytes[0],
+      publicAmount0: inputsInBytes[1],
+      publicAmount1: inputsInBytes[2],
+      extDataHash: inputsInBytes[3],
+      inputNullifiers: [inputsInBytes[6], inputsInBytes[7]],
+      outputCommitments: [inputsInBytes[8], inputsInBytes[9]],
+    };
+
+    console.log("Building transact (consolidate) with Light Protocol nullifiers...");
+    const transactTx = await buildTransactWithLightNullifiersInstruction(
+      program,
+      proofToSubmit,
+      transactExtData,
+      admin.publicKey,
+      mintAddressA,
+      lightRPC
+    );
+
+    await sendTransactionWithALT(
+      connection,
+      transactTx,
+      admin,
+      [],
+      [altAddress],
+      1400000
+    );
+    console.log("Consolidation successful!");
+
+    for (const commitment of outputCommitments) {
+      globalMerkleTree.insert(commitment);
+    }
+
+    consolidatedUtxo = outputs[0];
+    console.log("consolidatedUtxo amount:", consolidatedUtxo.amount.toString(),
+      "(was:", withdrawOutputUtxo.amount.toString(), "+", deposit2Utxo.amount.toString(), ")");
+  });
+
+  it("Transact - Transfer balance to User B", async () => {
+    // User A sends the full consolidated amount to User B
+    // Output[0] = UTXO with User B's pubkey (transfer amount)
+    // Output[1] = zero change UTXO with User A's pubkey
+
+    userBKeypair = UtxoKeypair.generateNew(lightWasm);
+    console.log("User B pubkey:", userBKeypair.pubkey.toString());
+
+    const userAKeypair = consolidatedUtxo.keypair;
+    const transferAmount = consolidatedUtxo.amount;
+
+    const transactExtData: ExtData = {
+      recipient: admin.publicKey,
+      extAmount: new BN(0),
+      encryptedOutput: Buffer.from("transfer"),
+      fee: new BN(0),
+      feeRecipient: feeRecipient.publicKey,
+      mintAddressA: mintAddressA,
+      mintAddressB: mintAddressA,
+    };
+
+    const inputs = [
+      consolidatedUtxo,
+      new Utxo({ lightWasm, keypair: userAKeypair, mintAddress: mintAddressA.toString() }),
+    ];
+
+    // Build Merkle paths
+    const inputMerklePathIndices: number[] = [];
+    const inputMerklePathElements: string[][] = [];
+
+    for (const input of inputs) {
+      if (input.amount.gt(new BN(0))) {
+        const commitment = await input.getCommitment();
+        input.index = globalMerkleTree.indexOf(commitment);
+        if (input.index === -1) input.index = 0;
+        inputMerklePathIndices.push(input.index);
+        inputMerklePathElements.push(globalMerkleTree.path(input.index).pathElements);
+      } else {
+        inputMerklePathIndices.push(0);
+        inputMerklePathElements.push(new Array(globalMerkleTree.levels).fill(0));
+      }
+    }
+
+    const outputs = [
+      // User B receives the transferred amount
+      new Utxo({
+        lightWasm,
+        amount: transferAmount.toString(),
+        keypair: userBKeypair,
+        index: globalMerkleTree._layers[0].length,
+        mintAddress: mintAddressA.toString(),
+      }),
+      // Zero change to User A
+      new Utxo({
+        lightWasm,
+        amount: 0,
+        keypair: userAKeypair,
+        mintAddress: mintAddressA.toString(),
+      }),
+    ];
+
+    const inputNullifiers = await Promise.all(inputs.map(x => x.getNullifier()));
+    const outputCommitments = await Promise.all(outputs.map(x => x.getCommitment()));
+    const root = globalMerkleTree.root();
+    const extDataHash = getExtDataHash(transactExtData);
+
+    const proofInput: ProofInput = {
+      root,
+      inputNullifier: inputNullifiers,
+      outputCommitment: outputCommitments,
+      publicAmount0: "0",
+      publicAmount1: "0",
+      extDataHash,
+      mintAddress0: publicKeyToFieldElement(mintAddressA),
+      mintAddress1: publicKeyToFieldElement(mintAddressA),
+      inAmount: inputs.map(x => x.amount.toString(10)),
+      inMintAddress: inputs.map(x => x.mintAddress),
+      inPrivateKey: inputs.map(x => x.keypair.privkey),
+      inBlinding: inputs.map(x => x.blinding.toString(10)),
+      inPathIndices: inputMerklePathIndices,
+      inPathElements: inputMerklePathElements,
+      outAmount: outputs.map(x => x.amount.toString(10)),
+      outMintAddress: outputs.map(x => x.mintAddress),
+      outPubkey: outputs.map(x => x.keypair.pubkey),
+      outBlinding: outputs.map(x => x.blinding.toString(10)),
+    };
+
+    const proofResult = await prove(proofInput, keyBasePath);
+    const proofInBytes = parseProofToBytesArray(proofResult.proof, true);
+    const inputsInBytes = parseToBytesArray(proofResult.publicSignals);
+
+    const proofToSubmit: ProofToSubmit = {
+      proofA: proofInBytes.proofA,
+      proofB: proofInBytes.proofB.flat(),
+      proofC: proofInBytes.proofC,
+      root: inputsInBytes[0],
+      publicAmount0: inputsInBytes[1],
+      publicAmount1: inputsInBytes[2],
+      extDataHash: inputsInBytes[3],
+      inputNullifiers: [inputsInBytes[6], inputsInBytes[7]],
+      outputCommitments: [inputsInBytes[8], inputsInBytes[9]],
+    };
+
+    console.log("Building transact (transfer to User B) with Light Protocol nullifiers...");
+    const transactTx = await buildTransactWithLightNullifiersInstruction(
+      program,
+      proofToSubmit,
+      transactExtData,
+      admin.publicKey,
+      mintAddressA,
+      lightRPC
+    );
+
+    await sendTransactionWithALT(
+      connection,
+      transactTx,
+      admin,
+      [],
+      [altAddress],
+      1400000
+    );
+    console.log("Transfer to User B successful!");
+
+    for (const commitment of outputCommitments) {
+      globalMerkleTree.insert(commitment);
+    }
+
+    transferredUtxo = outputs[0];
+    console.log("transferredUtxo amount:", transferredUtxo.amount.toString(),
+      "owned by User B pubkey:", userBKeypair.pubkey.toString());
+  });
+
+  it("Withdraw by User B (proves ownership of transferred UTXO)", async () => {
+    // User B received a UTXO via transact. Now User B proves ownership
+    // by providing their private key in the ZK proof, and withdraws.
+
+    // Withdraw most of the balance, leaving enough for the fee
+    // fee = floor(withdrawalAmount * 30/10000), so max withdraw = floor(balance / 1.003)
+    const balance = transferredUtxo.amount.toNumber();
+    const withdrawalAmount = Math.floor(balance / (1 + WITHDRAW_FEE_RATE / 10000));
+    const withdrawalFee = new BN(calculateWithdrawalFee(withdrawalAmount));
+
+    const recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      admin,
+      mintAddressA,
+      recipient.publicKey
+    );
+
+    const feeRecipientTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      admin,
+      mintAddressA,
+      feeRecipient.publicKey
+    );
+
+    const withdrawExtData: ExtData = {
+      recipient: recipient.publicKey,
+      extAmount: new BN(-withdrawalAmount),
+      encryptedOutput: Buffer.from(""),
+      fee: withdrawalFee,
+      feeRecipient: feeRecipientTokenAccount.address,
+      mintAddressA: mintAddressA,
+      mintAddressB: mintAddressA,
+    };
+
+    // User B's UTXO as input; second input is a zero-UTXO with User B's keypair
+    const inputs = [
+      transferredUtxo,
+      new Utxo({ lightWasm, keypair: userBKeypair, mintAddress: mintAddressA.toString() }),
+    ];
+
+    const inputsSum = inputs.reduce((sum, x) => sum.add(x.amount), new BN(0));
+    const publicAmount0 = new BN(-withdrawalAmount).sub(withdrawalFee).add(FIELD_SIZE).mod(FIELD_SIZE);
+    const remainingAmount = inputsSum.sub(new BN(withdrawalAmount)).sub(withdrawalFee);
+
+    const outputs = [
+      new Utxo({
+        lightWasm,
+        amount: remainingAmount.toString(),
+        keypair: userBKeypair,
+        index: globalMerkleTree._layers[0].length,
+        mintAddress: mintAddressA.toString(),
+      }),
+      new Utxo({
+        lightWasm,
+        amount: 0,
+        keypair: userBKeypair,
+        mintAddress: mintAddressA.toString(),
+      }),
+    ];
+
+    // Build Merkle paths
+    const inputMerklePathIndices: number[] = [];
+    const inputMerklePathElements: string[][] = [];
+
+    for (const input of inputs) {
+      if (input.amount.gt(new BN(0))) {
+        const commitment = await input.getCommitment();
+        input.index = globalMerkleTree.indexOf(commitment);
+        if (input.index === -1) input.index = 0;
+        inputMerklePathIndices.push(input.index);
+        inputMerklePathElements.push(globalMerkleTree.path(input.index).pathElements);
+      } else {
+        inputMerklePathIndices.push(0);
+        inputMerklePathElements.push(new Array(globalMerkleTree.levels).fill(0));
+      }
+    }
+
+    const inputNullifiers = await Promise.all(inputs.map(x => x.getNullifier()));
+    const outputCommitments = await Promise.all(outputs.map(x => x.getCommitment()));
+    const root = globalMerkleTree.root();
+    const extDataHash = getExtDataHash(withdrawExtData);
+
+    const proofInput: ProofInput = {
+      root,
+      inputNullifier: inputNullifiers,
+      outputCommitment: outputCommitments,
+      publicAmount0: publicAmount0.toString(),
+      publicAmount1: "0",
+      extDataHash,
+      mintAddress0: publicKeyToFieldElement(mintAddressA),
+      mintAddress1: publicKeyToFieldElement(mintAddressA),
+      inAmount: inputs.map(x => x.amount.toString(10)),
+      inMintAddress: inputs.map(x => x.mintAddress),
+      inPrivateKey: inputs.map(x => x.keypair.privkey),
+      inBlinding: inputs.map(x => x.blinding.toString(10)),
+      inPathIndices: inputMerklePathIndices,
+      inPathElements: inputMerklePathElements,
+      outAmount: outputs.map(x => x.amount.toString(10)),
+      outMintAddress: outputs.map(x => x.mintAddress),
+      outPubkey: outputs.map(x => x.keypair.pubkey),
+      outBlinding: outputs.map(x => x.blinding.toString(10)),
+    };
+
+    const proofResult = await prove(proofInput, keyBasePath);
+    const proofInBytes = parseProofToBytesArray(proofResult.proof, true);
+    const inputsInBytes = parseToBytesArray(proofResult.publicSignals);
+
+    const proofToSubmit: ProofToSubmit = {
+      proofA: proofInBytes.proofA,
+      proofB: proofInBytes.proofB.flat(),
+      proofC: proofInBytes.proofC,
+      root: inputsInBytes[0],
+      publicAmount0: inputsInBytes[1],
+      publicAmount1: inputsInBytes[2],
+      extDataHash: inputsInBytes[3],
+      inputNullifiers: [inputsInBytes[6], inputsInBytes[7]],
+      outputCommitments: [inputsInBytes[8], inputsInBytes[9]],
+    };
+
+    console.log("Building withdraw by User B (transferred UTXO)...");
+    const withdrawTx = await buildWithdrawWithLightNullifiersInstruction(
+      program,
+      proofToSubmit,
+      withdrawExtData,
+      admin.publicKey,
+      mintAddressA,
+      lightRPC
+    );
+
+    await sendTransactionWithALT(
+      connection,
+      withdrawTx,
+      admin,
+      [],
+      [altAddress],
+      1400000
+    );
+    console.log("Withdraw by User B successful!");
+    console.log("User B withdrew:", withdrawalAmount, "from transferred UTXO");
+    console.log("Remaining change:", remainingAmount.toString());
+
+    for (const commitment of outputCommitments) {
+      globalMerkleTree.insert(commitment);
+    }
+
+    userBWithdrawChangeUtxo = outputs[0];
+  });
+
+  // ============================================================
+  // User B: deposit + consolidate with received transfer change
+  // ============================================================
+
+  it("Deposit for User B (creates second UTXO with userBKeypair)", async () => {
+    const depositAmount = 20000;
+    const depositFee = new BN(calculateDepositFee(depositAmount));
+
+    const reserveTokenAccount = getAssociatedTokenAddressSync(
+      mintAddressA,
+      globalConfig,
+      true
+    );
+
+    const depositExtData: ExtData = {
+      recipient: reserveTokenAccount,
+      extAmount: new BN(depositAmount),
+      encryptedOutput: Buffer.from("userB-deposit"),
+      fee: depositFee,
+      feeRecipient: getAssociatedTokenAddressSync(mintAddressA, feeRecipient.publicKey, true),
+      mintAddressA: mintAddressA,
+      mintAddressB: mintAddressA,
+    };
+
+    const depositInputs = [
+      new Utxo({ lightWasm, mintAddress: mintAddressA.toString() }),
+      new Utxo({ lightWasm, mintAddress: mintAddressA.toString() }),
+    ];
+
+    const publicAmount = depositExtData.extAmount.sub(depositFee);
+    const publicAmountNumber = publicAmount.add(FIELD_SIZE).mod(FIELD_SIZE);
+    const outputAmount = publicAmountNumber.toString();
+
+    // Output UTXO owned by User B
+    const depositOutputs = [
+      new Utxo({
+        lightWasm,
+        amount: outputAmount,
+        keypair: userBKeypair,
+        index: globalMerkleTree._layers[0].length,
+        mintAddress: mintAddressA.toString()
+      }),
+      new Utxo({
+        lightWasm,
+        amount: 0,
+        keypair: userBKeypair,
+        mintAddress: mintAddressA.toString()
+      })
+    ];
+
+    const depositInputMerklePathIndices = depositInputs.map(() => 0);
+    const depositInputMerklePathElements = depositInputs.map(() => {
+      return [...new Array(globalMerkleTree.levels).fill(0)];
+    });
+
+    const depositInputNullifiers = await Promise.all(depositInputs.map(x => x.getNullifier()));
+    const depositOutputCommitments = await Promise.all(depositOutputs.map(x => x.getCommitment()));
+    const depositRoot = globalMerkleTree.root();
+    const depositExtDataHash = getExtDataHash(depositExtData);
+
+    const depositInput: ProofInput = {
+      root: depositRoot,
+      inputNullifier: depositInputNullifiers,
+      outputCommitment: depositOutputCommitments,
+      publicAmount0: publicAmountNumber.toString(),
+      publicAmount1: "0",
+      extDataHash: depositExtDataHash,
+      mintAddress0: publicKeyToFieldElement(mintAddressA),
+      mintAddress1: publicKeyToFieldElement(mintAddressA),
+      inAmount: depositInputs.map(x => x.amount.toString(10)),
+      inMintAddress: depositInputs.map(x => x.mintAddress),
+      inPrivateKey: depositInputs.map(x => x.keypair.privkey),
+      inBlinding: depositInputs.map(x => x.blinding.toString(10)),
+      inPathIndices: depositInputMerklePathIndices,
+      inPathElements: depositInputMerklePathElements,
+      outAmount: depositOutputs.map(x => x.amount.toString(10)),
+      outMintAddress: depositOutputs.map(x => x.mintAddress),
+      outPubkey: depositOutputs.map(x => x.keypair.pubkey),
+      outBlinding: depositOutputs.map(x => x.blinding.toString(10)),
+    };
+
+    const depositProofResult = await prove(depositInput, keyBasePath);
+    const depositProofInBytes = parseProofToBytesArray(depositProofResult.proof, true);
+    const depositInputsInBytes = parseToBytesArray(depositProofResult.publicSignals);
+
+    const depositProofToSubmit: ProofToSubmit = {
+      proofA: depositProofInBytes.proofA,
+      proofB: depositProofInBytes.proofB.flat(),
+      proofC: depositProofInBytes.proofC,
+      root: depositInputsInBytes[0],
+      publicAmount0: depositInputsInBytes[1],
+      publicAmount1: depositInputsInBytes[2],
+      extDataHash: depositInputsInBytes[3],
+      inputNullifiers: [depositInputsInBytes[6], depositInputsInBytes[7]],
+      outputCommitments: [depositInputsInBytes[8], depositInputsInBytes[9]],
+    };
+
+    const depositTx = await buildDepositWithLightNullifiersInstruction(
+      program,
+      depositProofToSubmit,
+      depositExtData,
+      admin.publicKey,
+      mintAddressA,
+      lightRPC
+    );
+
+    await sendTransactionWithALT(
+      connection,
+      depositTx,
+      admin,
+      [],
+      [altAddress],
+      1400000
+    );
+    console.log("Deposit for User B successful!");
+
+    for (const commitment of depositOutputCommitments) {
+      globalMerkleTree.insert(commitment);
+    }
+
+    userBDepositUtxo = depositOutputs[0];
+    console.log("userBDepositUtxo amount:", userBDepositUtxo.amount.toString());
+  });
+
+  it("User B consolidates: withdraw change + deposit → one UTXO", async () => {
+    // User B has two UTXOs:
+    //   1. userBWithdrawChangeUtxo (change from earlier withdraw)
+    //   2. userBDepositUtxo (from deposit above)
+    // Consolidate into a single UTXO using transact (publicAmount = 0)
+
+    const totalAmount = userBWithdrawChangeUtxo.amount.add(userBDepositUtxo.amount);
+    console.log("Consolidating:", userBWithdrawChangeUtxo.amount.toString(),
+      "+", userBDepositUtxo.amount.toString(), "=", totalAmount.toString());
+
+    const transactExtData: ExtData = {
+      recipient: admin.publicKey,
+      extAmount: new BN(0),
+      encryptedOutput: Buffer.from("userB-consolidate"),
+      fee: new BN(0),
+      feeRecipient: feeRecipient.publicKey,
+      mintAddressA: mintAddressA,
+      mintAddressB: mintAddressA,
+    };
+
+    const inputs = [userBWithdrawChangeUtxo, userBDepositUtxo];
+
+    // Build Merkle paths for both inputs
+    const inputMerklePathIndices: number[] = [];
+    const inputMerklePathElements: string[][] = [];
+
+    for (const input of inputs) {
+      if (input.amount.gt(new BN(0))) {
+        const commitment = await input.getCommitment();
+        input.index = globalMerkleTree.indexOf(commitment);
+        if (input.index === -1) input.index = 0;
+        inputMerklePathIndices.push(input.index);
+        inputMerklePathElements.push(globalMerkleTree.path(input.index).pathElements);
+      } else {
+        inputMerklePathIndices.push(0);
+        inputMerklePathElements.push(new Array(globalMerkleTree.levels).fill(0));
+      }
+    }
+
+    const outputs = [
+      new Utxo({
+        lightWasm,
+        amount: totalAmount.toString(),
+        keypair: userBKeypair,
+        index: globalMerkleTree._layers[0].length,
+        mintAddress: mintAddressA.toString(),
+      }),
+      new Utxo({
+        lightWasm,
+        amount: 0,
+        keypair: userBKeypair,
+        mintAddress: mintAddressA.toString(),
+      }),
+    ];
+
+    const inputNullifiers = await Promise.all(inputs.map(x => x.getNullifier()));
+    const outputCommitments = await Promise.all(outputs.map(x => x.getCommitment()));
+    const root = globalMerkleTree.root();
+    const extDataHash = getExtDataHash(transactExtData);
+
+    const proofInput: ProofInput = {
+      root,
+      inputNullifier: inputNullifiers,
+      outputCommitment: outputCommitments,
+      publicAmount0: "0",
+      publicAmount1: "0",
+      extDataHash,
+      mintAddress0: publicKeyToFieldElement(mintAddressA),
+      mintAddress1: publicKeyToFieldElement(mintAddressA),
+      inAmount: inputs.map(x => x.amount.toString(10)),
+      inMintAddress: inputs.map(x => x.mintAddress),
+      inPrivateKey: inputs.map(x => x.keypair.privkey),
+      inBlinding: inputs.map(x => x.blinding.toString(10)),
+      inPathIndices: inputMerklePathIndices,
+      inPathElements: inputMerklePathElements,
+      outAmount: outputs.map(x => x.amount.toString(10)),
+      outMintAddress: outputs.map(x => x.mintAddress),
+      outPubkey: outputs.map(x => x.keypair.pubkey),
+      outBlinding: outputs.map(x => x.blinding.toString(10)),
+    };
+
+    const proofResult = await prove(proofInput, keyBasePath);
+    const proofInBytes = parseProofToBytesArray(proofResult.proof, true);
+    const inputsInBytes = parseToBytesArray(proofResult.publicSignals);
+
+    const proofToSubmit: ProofToSubmit = {
+      proofA: proofInBytes.proofA,
+      proofB: proofInBytes.proofB.flat(),
+      proofC: proofInBytes.proofC,
+      root: inputsInBytes[0],
+      publicAmount0: inputsInBytes[1],
+      publicAmount1: inputsInBytes[2],
+      extDataHash: inputsInBytes[3],
+      inputNullifiers: [inputsInBytes[6], inputsInBytes[7]],
+      outputCommitments: [inputsInBytes[8], inputsInBytes[9]],
+    };
+
+    console.log("Building User B consolidation...");
+    const transactTx = await buildTransactWithLightNullifiersInstruction(
+      program,
+      proofToSubmit,
+      transactExtData,
+      admin.publicKey,
+      mintAddressA,
+      lightRPC
+    );
+
+    await sendTransactionWithALT(
+      connection,
+      transactTx,
+      admin,
+      [],
+      [altAddress],
+      1400000
+    );
+    console.log("User B consolidation successful!");
+    console.log("Consolidated UTXO amount:", totalAmount.toString(),
+      "(was:", userBWithdrawChangeUtxo.amount.toString(), "+", userBDepositUtxo.amount.toString(), ")");
+
+    for (const commitment of outputCommitments) {
+      globalMerkleTree.insert(commitment);
     }
   });
 });

@@ -1,0 +1,63 @@
+---
+title: 'Relayer Service'
+description: 'Optional service for gasless transactions and enhanced privacy'
+---
+
+> The relayer is **not part of the core Yona protocol**. It is an _optional external service_ designed to boost privacy.
+
+The relayer network is fully permissionless - anyone can run a relayer to process transactions and earn fees. The protocol facilitates matching between users and competing independent relayers, remaining neutral and non-custodial.
+
+## Overview
+
+A relayer is an intermediary service that:
+
+- Submits transactions on behalf of users
+- Pays transaction fees and nullifier costs in SOL
+- Collects a service fee (see [Fees](./fees))
+- Enhances privacy by decoupling submission from wallet address
+
+This is particularly useful for users who want to withdraw or swap funds without first acquiring SOL or revealing their withdrawal address.
+
+
+Check out [relayer](https://github.com/Yona-Labs/yona-privacy-app/tree/main/indexer) repository for more details.
+
+---
+
+## How It Works
+
+### Transaction Flow
+
+```
+User generates ZK proof using frontend and secret message(can do it locally)
+   ↓
+User sends proof + withdrawal details to relayer
+   ↓
+Relayer validates proof structure
+   ↓
+Relayer submits transaction to blockchain
+   ↓
+Relayer pays gas fees in SOL for the transaction and nullifier costs
+   ↓
+User receives funds minus relayer fee 
+```
+
+### Privacy Benefits
+
+- **No SOL Required:** Withdraw without pre-funding an address
+- **Address Unlinking:** Relayer's address submits the transaction, not yours
+
+---
+
+
+## Relayer Limitations
+
+The relayer **cannot**:
+- Steal your funds (proof is cryptographically bound to the transaction data)
+- Modify transaction data (proof validates exact data)
+- Link deposits to withdrawals (zero-knowledge property)
+- Access your private keys or UTXOs
+
+He only can **reject** the transaction if its economically unfeasible to process it.
+
+See [Public Inputs & Data Integrity](./technical#public-inputs--data-integrity) for more details.
+

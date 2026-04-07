@@ -1,0 +1,72 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Yona",
+  "colors": {
+    "primary": "#9333EA",
+    "light": "#A855F7",
+    "dark": "#7C3AED"
+  },
+  "favicon": "/favicon.ico",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "index",
+              "faq",
+              "token"
+            ]
+          },
+         
+          {
+            "group": "Features",
+            "pages": [
+              "features/private-assets"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/technical",
+              "concepts/fees",
+              "concepts/relayer"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/Yona-Labs/yona-privacy-app",
+          "icon": "github"
+        },
+        {
+          "anchor": "Discord",
+          "href": "https://discord.gg/yonaprivacy",
+          "icon": "discord"
+        },
+        {
+          "anchor": "Twitter",
+          "href": "https://x.com/YonaPrivacy",
+          "icon": "twitter"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Yona-Labs/yona-privacy-app",
+      "twitter": "https://x.com/YonaPrivacy"
+    }
+  }
+}

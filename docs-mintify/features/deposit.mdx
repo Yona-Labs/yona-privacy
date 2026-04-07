@@ -1,0 +1,51 @@
+---
+title: "Deposits"
+description: "Add tokens to your private balance"
+---
+
+## Overview
+
+Deposits let you move tokens from your public wallet into the Yona privacy pool. Once deposited, your tokens become private notes that only you can access. Your deposit amount is visible when depositing, but all future transactions with these funds will be private.
+
+## How to Deposit
+
+The process is simple: choose which token to deposit (SOL, USDC, etc.), enter the amount, wait for the app to generate a zero-knowledge proof (2-5 seconds), approve the transaction in your wallet, and then save your private note securely.
+
+## Choosing an Amount
+
+Consider the minimum (usually 0.01 tokens), maximum (set by protocol), and protocol fee (~0.1-0.5%). Never deposit more than you can afford to lose, and always backup your notes immediately.
+
+## Fees
+
+For example, depositing 100 USDC costs 0.30 USDC protocol fee (at 0.3%) plus 0.000005 SOL network fee, totaling 100.30 USDC plus gas.
+
+## Saving Your Note
+
+After depositing, you'll receive a private note. You can download it as an encrypted JSON file, copy the data to your password manager, or write the secrets down on paper (most secure).
+
+<Warning>
+If you lose your note, you lose access to your funds permanently. There is no recovery mechanism by design.
+</Warning>
+
+## Privacy Tips
+
+For better privacy, split large deposits into smaller amounts, don't use round numbers, wait between multiple deposits, and consider using fresh wallet addresses.
+
+## Troubleshooting
+
+**Transaction Failed?** Check you have enough balance plus fees, try with a higher priority fee, or verify the token is supported.
+
+**Proof Generation Failed?** Use Chrome or Firefox browser, close other tabs to free memory, and check your internet connection.
+
+**Lost Your Note?** Check your browser downloads folder first. If it's completely lost, the funds cannot be recovered.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Withdraw" icon="money-bill-transfer" href="/features/withdraw">
+    Cash out privately
+  </Card>
+  <Card title="Swap" icon="right-left" href="/features/swap">
+    Exchange tokens
+  </Card>
+</CardGroup>
